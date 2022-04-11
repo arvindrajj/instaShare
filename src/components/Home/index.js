@@ -5,7 +5,7 @@ import UserStories from '../UsersStories'
 import LoadingView from '../LoadingView'
 import FailureView from '../FailureView'
 import PostItem from '../PostItem'
-import apiRequestPromise from '../apiRequest'
+import apiRequest from '../apiRequest'
 import {useDetails} from '../../context/UserPostsContext'
 
 import {
@@ -79,7 +79,7 @@ const Home = () => {
     storiesDispatch({type: apiStatus.loading})
     const apiUrl = 'https://apis.ccbp.in/insta-share/stories'
     try {
-      const data = await apiRequestPromise({method: 'GET', apiUrl})
+      const data = await apiRequest({method: 'GET', apiUrl})
       const usersStoriesList = data.users_stories.map(each => ({
         userId: each.user_id,
         userName: each.user_name,
@@ -94,7 +94,7 @@ const Home = () => {
     postsDispatch({type: apiStatus.loading})
     const apiUrl = `https://apis.ccbp.in/insta-share/posts?search=${searchInput}`
     try {
-      const data = await apiRequestPromise({method: 'GET', apiUrl})
+      const data = await apiRequest({method: 'GET', apiUrl})
       const userPostsList = data.posts.map(each => ({
         postId: each.post_id,
         userId: each.user_id,

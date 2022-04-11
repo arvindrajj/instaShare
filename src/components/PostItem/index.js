@@ -1,10 +1,11 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import {useState, useEffect} from 'react'
-import Cookies from 'js-cookie'
 import {BsHeart} from 'react-icons/bs'
 import {FcLike} from 'react-icons/fc'
 import {FaRegComment} from 'react-icons/fa'
 import {BiShareAlt} from 'react-icons/bi'
 import useLocalStorage from '../useLocalStorage'
+import apiRequest from '../apiRequest'
 
 import {
   PostContainer,
@@ -27,23 +28,21 @@ const PostItem = props => {
   const {userPostDetails} = props
   const {postId} = userPostDetails
   const [likeStatus, setLikeStatus] = useLocalStorage(postId, false)
-  useEffect(() => {
-    const fetchData = async () => {
-      const jwtToken = Cookies.get('jwt_token')
-      const apiUrl = `https://apis.ccbp.in/insta-share/posts/${postId}/like`
-      const options = {
-        method: 'POST',
-        body: JSON.stringify({like_status: likeStatus}),
-        headers: {
-          Authorization: `Bearer ${jwtToken}`,
-        },
-      }
-      const response = await fetch(apiUrl, options)
-      const data = await response.json()
+
+  const fetchLikeStatus = async () => {
+    const apiUrl = `https://apis.ccbp.in/insta-share/posts/${postId}/like`
+    const body = JSON.stringify({like_status: likeStatus})
+    try {
+      const data = await apiRequest({method: 'POST', apiUrl, body})
       setMessage(data.message)
+    } catch (error) {
+      setMessage(message)
     }
-    fetchData()
-  }, [likeStatus, postId])
+  }
+
+  useEffect(() => {
+    fetchLikeStatus()
+  }, [likeStatus])
 
   const {
     userId,

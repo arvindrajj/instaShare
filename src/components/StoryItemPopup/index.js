@@ -116,7 +116,7 @@ const StoryItemPopup = props => {
   return (
     <ReactPopup
       trigger={
-        <div key={usersStoryDetails.userId} className="popup-trigger">
+        <div className="popup-trigger">
           <StoryItem
             onClick={() => onChangeCurrentSlider(usersStoryDetails.userId)}
           >

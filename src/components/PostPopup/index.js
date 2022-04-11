@@ -1,5 +1,5 @@
-import {Component} from 'react'
-import Cookies from 'js-cookie'
+/* eslint-disable react-hooks/exhaustive-deps */
+import {useEffect, useReducer} from 'react'
 import {RiCloseLine} from 'react-icons/ri'
 import {BsHeart} from 'react-icons/bs'
 import {FcLike} from 'react-icons/fc'
@@ -8,6 +8,8 @@ import {BiShareAlt} from 'react-icons/bi'
 import {Link} from 'react-router-dom'
 import Popup from 'reactjs-popup'
 import LoadingView from '../LoadingView'
+import apiRequest from '../apiRequest'
+import useLocalStorage from '../useLocalStorage'
 
 /*
 you can import styledComponent (optional)
@@ -17,37 +19,46 @@ import {ReactPopup, PopupBgContainer, CloseButton} from './styledComponents'
 
 import './index.css'
 
-const apiStatusConstance = {
+const apiStatus = {
   initial: 'INITIAL',
   loading: 'LOADING',
   success: 'SUCCESS',
 }
 
-export default class PostPopUp extends Component {
-  state = {
-    postsList: [],
-    apiStatus: apiStatusConstance.initial,
-    isLiked: false,
-  }
+const initialState = {
+  postsList: [],
+  apiStatus: apiStatus.initial,
+}
 
-  componentDidMount = () => {
-    this.fetchPostDetails()
+const postsPopupReducer = (state, action) => {
+  switch (action.type) {
+    case apiStatus.loading:
+      return {...state, apiStatus: apiStatus.loading}
+    case apiStatus.success:
+      return {
+        ...state,
+        postsList: action.payload,
+        apiStatus: apiStatus.success,
+      }
+    case apiStatus.failure:
+      return {...state, apiStatus: apiStatus.failure}
+    default:
+      return state
   }
+}
 
-  fetchPostDetails = async () => {
-    this.setState({apiStatus: apiStatusConstance.loading})
-    const jwtToken = Cookies.get('jwt_token')
+const PostPopUp = props => {
+  const [postsState, postDispatch] = useReducer(postsPopupReducer, initialState)
+  const {postObject, alt} = props
+  const {image, id} = postObject
+  const [likeStatus, setLikeStatus] = useLocalStorage(id, false)
+
+  const fetchPostDetails = async () => {
+    postDispatch({type: apiStatus.loading})
     const apiUrl = `https://apis.ccbp.in/insta-share/posts`
-    const options = {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${jwtToken}`,
-      },
-    }
-    const response = await fetch(apiUrl, options)
-    const data = await response.json()
-    if (response.ok) {
-      const postsList = data.posts.map(each => ({
+    try {
+      const data = await apiRequest({method: 'GET', apiUrl})
+      const userPostsList = data.posts.map(each => ({
         postId: each.post_id,
         userId: each.user_id,
         userName: each.user_name,
@@ -57,6 +68,7 @@ export default class PostPopUp extends Component {
           caption: each.post_details.caption,
         },
         likesCount: each.likes_count,
+        isLiked: false,
         comments: each.comments.map(eachComment => ({
           userName: eachComment.user_name,
           userId: eachComment.user_id,
@@ -64,20 +76,32 @@ export default class PostPopUp extends Component {
         })),
         createdAt: each.created_at,
       }))
-      this.setState({postsList, apiStatus: apiStatusConstance.success})
-    } else {
-      console.log(data.error_msg)
+      postDispatch({type: apiStatus.success, payload: userPostsList})
+    } catch (error) {
+      postDispatch({type: apiStatus.failure})
     }
   }
 
-  onToggleLike = () => {
-    this.setState(prevState => ({isLiked: !prevState.isLiked}))
+  const fetchLikeStatus = async () => {
+    const apiUrl = `https://apis.ccbp.in/insta-share/posts/${id}/like`
+    const body = JSON.stringify({like_status: likeStatus})
+    try {
+      await apiRequest({method: 'POST', apiUrl, body})
+    } catch (error) {
+      setLikeStatus(likeStatus)
+    }
   }
 
-  renderPopupView = () => {
-    const {postsList, isLiked} = this.state
-    const {postObject} = this.props
-    const {id} = postObject
+  useEffect(() => {
+    fetchPostDetails()
+  }, [])
+
+  useEffect(() => {
+    fetchLikeStatus()
+  }, [likeStatus])
+
+  const renderPopupView = () => {
+    const {postsList} = postsState
     const filteredPostDetails = postsList.filter(each => each.postId === id)
     const {
       userId,
@@ -141,14 +165,17 @@ export default class PostPopUp extends Component {
           <div className="popup-bottom-content-container">
             <div className="popup-icons-container">
               <button type="button" className="popup-button">
-                {isLiked ? (
+                {likeStatus ? (
                   <FcLike
                     size="20"
                     color="#F05161"
-                    onClick={this.onToggleLike}
+                    onClick={() => setLikeStatus(!likeStatus)}
                   />
                 ) : (
-                  <BsHeart size="20" onClick={this.onToggleLike} />
+                  <BsHeart
+                    size="20"
+                    onClick={() => setLikeStatus(!likeStatus)}
+                  />
                 )}
               </button>
               <button type="button" className="popup-button">
@@ -159,7 +186,7 @@ export default class PostPopUp extends Component {
               </button>
             </div>
             <p className="popup-likes-count">
-              {isLiked ? parseInt(likesCount) + 1 : likesCount} likes
+              {likeStatus ? parseInt(likesCount) + 1 : likesCount} likes
             </p>
             <p className="popup-created-at">{createdAt}</p>
           </div>
@@ -168,43 +195,39 @@ export default class PostPopUp extends Component {
     )
   }
 
-  renderPopupViewDetails = () => {
-    const {apiStatus} = this.state
-    switch (apiStatus) {
+  const renderPopupViewDetails = () => {
+    switch (postsState.apiStatus) {
       case 'SUCCESS':
-        return this.renderPopupView()
+        return renderPopupView()
       case 'LOADING':
         return <LoadingView />
       default:
         return null
     }
   }
-
-  render() {
-    const {postObject, alt} = this.props
-    const {image} = postObject
-    return (
-      <Popup
-        trigger={
-          <li className="profile-post-item">
-            <img src={image} alt={alt} className="profile-post-image" />
-          </li>
-        }
-        modal
-      >
-        {close => (
-          <div className="post-popup-bg-container">
-            <button
-              className="post-popup-close-button"
-              type="button"
-              onClick={close}
-            >
-              <RiCloseLine color="#ffffff" size="35" />
-            </button>
-            {this.renderPopupViewDetails()}
-          </div>
-        )}
-      </Popup>
-    )
-  }
+  return (
+    <Popup
+      trigger={
+        <li className="profile-post-item">
+          <img src={image} alt={alt} className="profile-post-image" />
+        </li>
+      }
+      modal
+    >
+      {close => (
+        <div className="post-popup-bg-container">
+          <button
+            className="post-popup-close-button"
+            type="button"
+            onClick={close}
+          >
+            <RiCloseLine color="#ffffff" size="35" />
+          </button>
+          {renderPopupViewDetails()}
+        </div>
+      )}
+    </Popup>
+  )
 }
+
+export default PostPopUp
